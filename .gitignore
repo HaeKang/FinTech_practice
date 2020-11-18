@@ -1,6 +1,8 @@
 node_modules
 package-lock.json
 package.json
-code/mysql_info.js
+201117_practice/code/mysql_info.js
+201118_api_practice/api_info.js
+201118_api_practice/mysql_info.js
 dist/*
 *.log
