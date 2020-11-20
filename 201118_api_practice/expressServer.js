@@ -72,6 +72,11 @@ app.get('/qrcode', function(req, res){
     res.render('qrcode');
 });
 
+
+app.get('/qrreader', function(req, res){
+    res.render('qrreader');
+});
+
 //------- api 인증코드 받고 토큰 발행 ----------------------
 app.get('/authResult', function(req, res){
     var authCode = req.query.code; // 인증코드 받음
@@ -324,11 +329,134 @@ app.post('/transactionList', auth, function(req, res){
 });
 
 //---------------------- 출금  --------------------------
+app.post('/withdraw', auth, function(req, res){
+ 
+    var finusenum = req.body.fin_use_num;   // 현재 로그인한 사용자의 핀테크번호
+    var tofinusenum = req.body.to_fin_use_num;  // 돈을 받을 사용자의 핀테크 번호
+
+    var countnum = Math.floor(Math.random() * 1000000000) + 1;
+    var transId = "T991671660U" + countnum; // 은행거래고유번호
+
+    var amount = req.body.amount;
+
+    var newDate = new Date();
+    var nowTime = newDate.toFormat('YYYYMMDDHH24MISS');
+
+    var userId = req.decoded.userId; 
+    var userSelectSql = "SELECT * FROM user WHERE id = ?";
+
+    connection.query(userSelectSql, [userId], function(err, results){
+        if(err){throw err}
+
+        else {
+
+          // 출금
+          var userAccessToken = results[0].accesstoken;
+          var userSeqNo = results[0].userseqno;
+
+          var option = {
+            method : "POST",
+            url : "https://testapi.openbanking.or.kr/v2.0/transfer/withdraw/fin_num",
+            headers : {
+                Authorization : "Bearer " + userAccessToken
+            },
+
+            //get 요청을 보낼때 데이터는 qs, post 에 form, json 입력가능
+            json : {
+                "bank_tran_id": transId,
+                "cntr_account_type": "N",   // 고정값
+                "cntr_account_num": "7836598807",   // 사이트에서 계좌관리 들가면 있음
+                "dps_print_content": "쇼핑몰환불",  // 고정값
+                "fintech_use_num": finusenum,
+                "wd_print_content": "오픈뱅킹출금", // 고정값
+                "tran_amt": amount,
+                "tran_dtime": nowTime,
+                "req_client_name": "홍길동",    // 고정값
+                "req_client_fintech_use_num" : finusenum,
+                "req_client_num": "HONGGILDONG1234",    // 고정값
+                "transfer_purpose": "ST",   // 고정값
+                "recv_client_name": "진상언",   // 고정값
+                "recv_client_bank_code": "097", // 고정값
+                "recv_client_account_num": "7836598807" // 사이트에서 계좌관리 들가면 있음
+            }
+          };
+
+          request(option, function (error, response, body1) {
+
+            // 입금 전용 accessToken 부여
+            var option = {
+
+                method : "POST",
+                url : "https://testapi.openbanking.or.kr/oauth/2.0/token",
+                headers : {
+                    "Content-Type" : "application/x-www-form-urlencoded"
+                },
+                form : {
+                    client_id : api_info[0],
+                    client_secret : api_info[1],
+                    scope : "oob",
+                    grant_type : "client_credentials"
+                
+                }
+            };
 
 
+            request(option, function(error, response, body){
+                var acctoken2 = JSON.parse(body);
+                acctoken2 = acctoken2.access_token;
+
+                // 입금
+                console.log(acctoken2);
 
 
+                if(body1.rsp_code == "A0000"){
+                    var countnum2 = Math.floor(Math.random() * 1000000000) + 1;
+                    var transId2 = "T991671660U" + countnum2; // 은행거래고유번호
 
+                    var option = {
+
+                        method : "POST",
+                        url : "https://testapi.openbanking.or.kr/v2.0/transfer/deposit/fin_num",
+                        headers : {
+                            Authorization : "Bearer " + acctoken2
+                        },
+
+                        json: {
+                            "cntr_account_type" : "N",
+                            "cntr_account_num" : "5612035165",
+                            "wd_pass_phrase" : "NONE",
+                            "wd_print_content" : "환불금액",
+                            "name_check_option" : "on",
+                            "tran_dtime" : nowTime,
+                            "req_cnt" : 1,
+                            "req_list" : [{
+                                "tran_no": "1",
+                                "bank_tran_id": transId2,
+                                "fintech_use_num": finusenum,
+                                "print_content": "오픈서비스캐시백",
+                                "tran_amt": "500",
+                                "req_client_name": "김오픈",
+                                "req_client_num": "HONGGILDONG1234",
+                                "req_client_fintech_use_num": finusenum,
+                                "transfer_purpose": "ST"
+                            }]
+                        }
+                    }
+                }
+                    request(option, function(error, response, body){
+                        console.log(body);
+                        res.json(body);
+                    });
+
+            
+        });
+
+
+    });
+        
+}});
+
+});
 
 
 //---------------------- 서버 실행 ----------------------
