@@ -166,7 +166,9 @@ app.post('/login', function(req, res){
                       },
                       function (err, token) {
                         console.log("로그인 성공", token);
-                        res.json(token);
+                        res.json({
+                            "jwtToken" : token
+                        });
                       }
                     );
 
@@ -183,12 +185,12 @@ app.post('/login', function(req, res){
 });
 
 
-//---------------------- 로그인한 유저 계좌 리스트 출력  --------------
-app.post('/list', auth, function(req, res){
+//---------------------- 유저 인증  ----------------------
 
+app.post('/userTokenInfo', auth, function(req, res){
     var userId = req.decoded.userId;
     var userSelectSql = "SELECT * FROM user WHERE id = ?";
-
+    
     connection.query(userSelectSql, [userId], function(err, results){
         if(err){
             throw err;
@@ -197,137 +199,19 @@ app.post('/list', auth, function(req, res){
             var userAccessToken = results[0].accesstoken;
             var userSeqNo = results[0].userseqno;
 
-            // api 옵션들 설정 (user/me)
-            var option = {
-                method : "GET",
-                url : "https://testapi.openbanking.or.kr/v2.0/user/me",
-                headers : {
-                    Authorization : "Bearer "+ userAccessToken
-                },
-                qs : {
-                    // 쿼리 보냄
-                    user_seq_no : userSeqNo
-                }
-            }
+            console.log(userAccessToken);
+            console.log(userSeqNo);
 
-            // api에 요청 
-            request(option, function(error, response, body){
-                var listResult = JSON.parse(body);
-                console.log(listResult);
-                res.json(listResult);
+            res.json({
+                "userAccessToken" : userAccessToken,
+                "userSeqNo" : userSeqNo
             });
-
         }
     });
 
 });
 
 
-
-//---------------------- 계좌 잔액 확인  ----------------
-app.post('/balance', auth, function(req, res){
-
-    var userId = req.decoded.userId;  
-    var finusenum = req.body.fin_use_num;   // 핀테크번호
-
-    var countnum = Math.floor(Math.random() * 1000000000) + 1;
-    var transId = "T991671660U" + countnum; // 은행거래고유번호
-
-    var newDate = new Date();
-    var nowTime = newDate.toFormat('YYYYMMDDHH24MISS');
-
-    var userSelectSql = "SELECT * FROM user WHERE id = ?";
-
-    connection.query(userSelectSql, [userId], function(err, results){
-        if(err){
-            throw err;
-        } else {
-
-            var userAccessToken = results[0].accesstoken;
-
-            // api 옵션들 설정 (user/me)
-            var option = {
-                method : "GET",
-                url : "https://testapi.openbanking.or.kr/v2.0/account/balance/fin_num",
-                headers : {
-                    Authorization : "Bearer "+ userAccessToken
-                },
-                qs : {
-                    // 쿼리 보냄
-                    bank_tran_id : transId,
-                    fintech_use_num : finusenum,
-                    tran_dtime : nowTime
-                }
-            }
-
-            // api에 요청 
-            request(option, function(error, response, body){
-                var requestResultJSON = JSON.parse(body);
-                console.log(requestResultJSON);
-                res.json(requestResultJSON);
-            });
-
-        }
-    });
-
-});
-
-
-//---------------------- 거래 내역 확인  ----------------
-app.post('/transactionList', auth, function(req, res){
-
-    var userId = req.decoded.userId;  
-    var finusenum = req.body.fin_use_num;   // 핀테크번호
-
-    var countnum = Math.floor(Math.random() * 1000000000) + 1;
-    var transId = "T991671660U" + countnum; // 은행거래고유번호
-
-    var newDate = new Date();
-    var nowTime = newDate.toFormat('YYYYMMDDHH24MISS');
-    var nowDay = newDate.toFormat('YYYYMMDD');
-
-    var userSelectSql = "SELECT * FROM user WHERE id = ?";
-
-    connection.query(userSelectSql, [userId], function(err, results){
-        if(err){
-            throw err;
-        } else {
-
-            var userAccessToken = results[0].accesstoken;
-
-            // api 옵션들 설정 (user/me)
-            var option = {
-                method : "GET",
-                url : "https://testapi.openbanking.or.kr/v2.0/account/transaction_list/fin_num",
-                headers : {
-                    Authorization : "Bearer "+ userAccessToken
-                },
-                qs : {
-                    // 쿼리 보냄
-                    bank_tran_id : transId,
-                    fintech_use_num : finusenum,
-                    inquiry_type : "A",
-                    inquiry_base : "D",
-                    from_date  : "20201101",
-                    to_date  : nowDay,
-                    sort_order : "D",
-                    tran_dtime : nowTime
-                }
-            }
-
-            // api에 요청 
-            request(option, function(error, response, body){
-                var requestResultJSON = JSON.parse(body);
-                console.log(requestResultJSON);
-                res.json(requestResultJSON);
-            });
-
-        }
-    });
-
-
-
-});
 
 //---------------------- 출금  --------------------------
 app.post('/withdraw', auth, function(req, res){
@@ -351,7 +235,7 @@ app.post('/withdraw', auth, function(req, res){
 
         else {
 
-          // 출금 (계좌 -> 이용기관) (출금 입금 호출은 함께 이루어져야함)
+          // 출금
           var userAccessToken = results[0].accesstoken;
           var userSeqNo = results[0].userseqno;
 
@@ -378,7 +262,7 @@ app.post('/withdraw', auth, function(req, res){
                 "transfer_purpose": "ST",   // 고정값
                 "recv_client_name": "진상언",   // 고정값
                 "recv_client_bank_code": "097", // 고정값
-                "recv_client_account_num": "7836598807" // 사이트에서 계좌관리 들가면 있음, 받는사람 계좌번호
+                "recv_client_account_num": "7836598807" // 사이트에서 계좌관리 들가면 있음
             }
           };
 
@@ -406,7 +290,7 @@ app.post('/withdraw', auth, function(req, res){
                 var acctoken2 = JSON.parse(body);
                 acctoken2 = acctoken2.access_token;
 
-                // 입금 (이용기관 -> 계좌)
+                // 입금
                 console.log(acctoken2);
 
 
